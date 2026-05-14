@@ -13,11 +13,13 @@
 
 ## Phase 1: Agent MVP
 
-- Add chat UI.
-- Add OpenAI-compatible provider config.
-- Add structured tool-call loop.
-- Add tool-call timeline and local logs.
-- Add manual approval for medium/high risk tools.
+- [x] Add basic agent task UI.
+- [x] Add OpenAI-compatible provider config.
+- [x] Add structured JSON command loop.
+- [x] Route model-selected tools through the local tool executor.
+- [x] Add tool-call timeline and local logs.
+- [ ] Add manual approval for medium/high risk tools.
+- [ ] Add Keystore-backed API key storage.
 
 ## Phase 2: Reliability
 

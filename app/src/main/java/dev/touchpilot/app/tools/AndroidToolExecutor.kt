@@ -1,0 +1,106 @@
+package dev.touchpilot.app.tools
+
+import android.content.Context
+import android.content.Intent
+import android.content.pm.ResolveInfo
+import dev.touchpilot.app.androidcontrol.AccessibilityBridge
+
+class AndroidToolExecutor(
+    private val context: Context
+) {
+    fun execute(name: String, args: Map<String, String>): ToolResult {
+        return when (name) {
+            "observe_screen" -> {
+                val snapshot = observeScreen()
+                record(name, "", AccessibilityBridge.isConnected(), "snapshot length=${snapshot.length}")
+                ToolResult(AccessibilityBridge.isConnected(), snapshot)
+            }
+            "open_app" -> {
+                val target = args["target"].orEmpty()
+                val ok = openApp(target)
+                record(name, "target=\"$target\"", ok, "openApp")
+                ToolResult(ok, "openApp")
+            }
+            "tap" -> {
+                val text = args["text"].orEmpty()
+                val ok = AccessibilityBridge.tapByText(text)
+                record(name, "text=\"$text\"", ok, "tapByText")
+                ToolResult(ok, "tapByText")
+            }
+            "type_text" -> {
+                val text = args["text"].orEmpty()
+                val ok = AccessibilityBridge.typeIntoFocusedField(text)
+                record(name, "text_length=${text.length}", ok, "typeIntoFocusedField")
+                ToolResult(ok, "typeIntoFocusedField")
+            }
+            "scroll" -> {
+                val direction = args["direction"].orEmpty()
+                val ok = if (direction.equals("backward", ignoreCase = true)) {
+                    AccessibilityBridge.scrollBackward()
+                } else {
+                    AccessibilityBridge.scrollForward()
+                }
+                record(name, "direction=\"$direction\"", ok, "scroll")
+                ToolResult(ok, "scroll")
+            }
+            "press_back" -> {
+                val ok = AccessibilityBridge.pressBack()
+                record(name, "", ok, "pressBack")
+                ToolResult(ok, "pressBack")
+            }
+            "press_home" -> {
+                val ok = AccessibilityBridge.pressHome()
+                record(name, "", ok, "pressHome")
+                ToolResult(ok, "pressHome")
+            }
+            "wait_for_ui" -> {
+                val text = args["text"].orEmpty()
+                val timeout = args["timeout_ms"]?.toLongOrNull() ?: 5_000L
+                val ok = AccessibilityBridge.waitForText(text, timeout)
+                record(name, "text=\"$text\", timeout_ms=$timeout", ok, "waitForText")
+                ToolResult(ok, "waitForText")
+            }
+            else -> {
+                record(name, args.toString(), false, "unknown tool")
+                ToolResult(false, "Unknown tool: $name")
+            }
+        }
+    }
+
+    fun observeScreen(): String {
+        return AccessibilityBridge.observeScreen()
+    }
+
+    fun openApp(target: String): Boolean {
+        if (target.isBlank()) return false
+
+        val exactLaunchIntent = context.packageManager.getLaunchIntentForPackage(target)
+        if (exactLaunchIntent != null) {
+            context.startActivity(exactLaunchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return true
+        }
+
+        val launcherIntent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+        }
+        val matches = context.packageManager.queryIntentActivities(launcherIntent, 0)
+        val match = matches.firstOrNull { info ->
+            info.launcherLabel().equals(target, ignoreCase = true)
+        } ?: matches.firstOrNull { info ->
+            info.launcherLabel().contains(target, ignoreCase = true)
+        } ?: return false
+
+        val intent = context.packageManager.getLaunchIntentForPackage(match.activityInfo.packageName)
+            ?: return false
+        context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        return true
+    }
+
+    private fun ResolveInfo.launcherLabel(): String {
+        return loadLabel(context.packageManager)?.toString().orEmpty()
+    }
+
+    private fun record(name: String, args: String, ok: Boolean, message: String) {
+        ToolExecutionLog.record(name, args, ok, message)
+    }
+}

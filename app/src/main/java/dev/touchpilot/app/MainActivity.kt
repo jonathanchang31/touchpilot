@@ -2,7 +2,6 @@ package dev.touchpilot.app
 
 import android.app.Activity
 import android.content.Intent
-import android.content.pm.ResolveInfo
 import android.os.Bundle
 import android.provider.Settings
 import android.view.ViewGroup
@@ -11,16 +10,22 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import dev.touchpilot.app.agent.AgentRunner
+import dev.touchpilot.app.agent.ProviderConfig
 import dev.touchpilot.app.androidcontrol.AccessibilityBridge
+import dev.touchpilot.app.tools.AndroidToolExecutor
 import dev.touchpilot.app.tools.ToolExecutionLog
 
 class MainActivity : Activity() {
     private lateinit var statusView: TextView
     private lateinit var outputView: TextView
     private lateinit var executionLogView: TextView
+    private lateinit var toolExecutor: AndroidToolExecutor
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        toolExecutor = AndroidToolExecutor(this)
+        val preferences = getSharedPreferences("touchpilot", MODE_PRIVATE)
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -48,14 +53,7 @@ class MainActivity : Activity() {
             text = "Observe Current Screen"
             setOnClickListener {
                 refreshStatus()
-                val snapshot = AccessibilityBridge.observeScreen()
-                ToolExecutionLog.record(
-                    name = "observe_screen",
-                    args = "",
-                    ok = AccessibilityBridge.isConnected(),
-                    message = "snapshot length=${snapshot.length}"
-                )
-                outputView.text = snapshot
+                outputView.text = toolExecutor.execute("observe_screen", emptyMap()).message
                 refreshExecutionLog()
             }
         }
@@ -69,8 +67,7 @@ class MainActivity : Activity() {
             text = "Open App"
             setOnClickListener {
                 val target = appInput.text.toString()
-                val ok = openApp(target)
-                recordAndRender("open_app", "target=\"$target\"", ok, "openApp")
+                executeAndRender("open_app", mapOf("target" to target))
             }
         }
 
@@ -83,9 +80,8 @@ class MainActivity : Activity() {
             text = "Tap Text"
             setOnClickListener {
                 val target = targetInput.text.toString()
-                val ok = AccessibilityBridge.tapByText(target)
                 refreshStatus()
-                recordAndRender("tap", "text=\"$target\"", ok, "tapByText")
+                executeAndRender("tap", mapOf("text" to target))
             }
         }
 
@@ -98,9 +94,8 @@ class MainActivity : Activity() {
             text = "Type Into Focused Field"
             setOnClickListener {
                 val value = typeInput.text.toString()
-                val ok = AccessibilityBridge.typeIntoFocusedField(value)
                 refreshStatus()
-                recordAndRender("type_text", "text_length=${value.length}", ok, "typeIntoFocusedField")
+                executeAndRender("type_text", mapOf("text" to value))
             }
         }
 
@@ -111,18 +106,16 @@ class MainActivity : Activity() {
         val backButton = Button(this).apply {
             text = "Back"
             setOnClickListener {
-                val ok = AccessibilityBridge.pressBack()
                 refreshStatus()
-                recordAndRender("press_back", "", ok, "pressBack")
+                executeAndRender("press_back", emptyMap())
             }
         }
 
         val homeButton = Button(this).apply {
             text = "Home"
             setOnClickListener {
-                val ok = AccessibilityBridge.pressHome()
                 refreshStatus()
-                recordAndRender("press_home", "", ok, "pressHome")
+                executeAndRender("press_home", emptyMap())
             }
         }
 
@@ -136,18 +129,16 @@ class MainActivity : Activity() {
         val scrollForwardButton = Button(this).apply {
             text = "Scroll Down"
             setOnClickListener {
-                val ok = AccessibilityBridge.scrollForward()
                 refreshStatus()
-                recordAndRender("scroll", "direction=\"forward\"", ok, "scrollForward")
+                executeAndRender("scroll", mapOf("direction" to "forward"))
             }
         }
 
         val scrollBackwardButton = Button(this).apply {
             text = "Scroll Up"
             setOnClickListener {
-                val ok = AccessibilityBridge.scrollBackward()
                 refreshStatus()
-                recordAndRender("scroll", "direction=\"backward\"", ok, "scrollBackward")
+                executeAndRender("scroll", mapOf("direction" to "backward"))
             }
         }
 
@@ -165,15 +156,79 @@ class MainActivity : Activity() {
                 val expectedText = waitInput.text.toString()
                 outputView.text = "Waiting for \"$expectedText\"..."
                 Thread {
-                    val ok = AccessibilityBridge.waitForText(expectedText, timeoutMs = 5_000L)
+                    val result = toolExecutor.execute(
+                        "wait_for_ui",
+                        mapOf("text" to expectedText, "timeout_ms" to "5000")
+                    )
                     runOnUiThread {
                         refreshStatus()
-                        recordAndRender(
-                            "wait_for_ui",
-                            "text=\"$expectedText\", timeout_ms=5000",
-                            ok,
-                            "waitForText"
-                        )
+                        outputView.text = "wait_for_ui -> ${result.ok}: ${result.message}"
+                        refreshExecutionLog()
+                    }
+                }.start()
+            }
+        }
+
+        val agentTitle = TextView(this).apply {
+            text = "Agent MVP"
+            textSize = 18f
+            setPadding(0, 36, 0, 8)
+        }
+
+        val providerUrlInput = EditText(this).apply {
+            hint = "OpenAI-compatible chat completions URL"
+            setSingleLine(true)
+            setText(
+                preferences.getString(
+                    "provider_url",
+                    "https://api.openai.com/v1/chat/completions"
+                )
+            )
+        }
+
+        val modelInput = EditText(this).apply {
+            hint = "Model name"
+            setSingleLine(true)
+            setText(preferences.getString("provider_model", "gpt-5.2-mini"))
+        }
+
+        val apiKeyInput = EditText(this).apply {
+            hint = "API key"
+            setSingleLine(true)
+        }
+
+        val taskInput = EditText(this).apply {
+            hint = "Agent task, e.g. observe the current screen"
+            setSingleLine(false)
+            minLines = 2
+        }
+
+        val runAgentButton = Button(this).apply {
+            text = "Run Agent Step Loop"
+            setOnClickListener {
+                val providerConfig = ProviderConfig(
+                    baseUrl = providerUrlInput.text.toString(),
+                    apiKey = apiKeyInput.text.toString(),
+                    model = modelInput.text.toString()
+                )
+                val task = taskInput.text.toString()
+
+                preferences.edit()
+                    .putString("provider_url", providerConfig.baseUrl)
+                    .putString("provider_model", providerConfig.model)
+                    .apply()
+
+                outputView.text = "Running agent..."
+                Thread {
+                    val resultText = runCatching {
+                        AgentRunner(toolExecutor).run(task, providerConfig).transcript
+                    }.getOrElse { error ->
+                        "Agent failed: ${error.message}"
+                    }
+                    runOnUiThread {
+                        outputView.text = resultText
+                        refreshStatus()
+                        refreshExecutionLog()
                     }
                 }.start()
             }
@@ -210,6 +265,12 @@ class MainActivity : Activity() {
         root.addView(scrollRow)
         root.addView(waitInput)
         root.addView(waitButton)
+        root.addView(agentTitle)
+        root.addView(providerUrlInput)
+        root.addView(modelInput)
+        root.addView(apiKeyInput)
+        root.addView(taskInput)
+        root.addView(runAgentButton)
         root.addView(outputView)
         root.addView(executionLogTitle)
         root.addView(executionLogView)
@@ -226,38 +287,9 @@ class MainActivity : Activity() {
         refreshStatus()
     }
 
-    private fun openApp(target: String): Boolean {
-        if (target.isBlank()) return false
-
-        val exactLaunchIntent = packageManager.getLaunchIntentForPackage(target)
-        if (exactLaunchIntent != null) {
-            startActivity(exactLaunchIntent)
-            return true
-        }
-
-        val launcherIntent = Intent(Intent.ACTION_MAIN).apply {
-            addCategory(Intent.CATEGORY_LAUNCHER)
-        }
-        val matches = packageManager.queryIntentActivities(launcherIntent, 0)
-        val match = matches.firstOrNull { info ->
-            info.launcherLabel().equals(target, ignoreCase = true)
-        } ?: matches.firstOrNull { info ->
-            info.launcherLabel().contains(target, ignoreCase = true)
-        } ?: return false
-
-        val intent = packageManager.getLaunchIntentForPackage(match.activityInfo.packageName)
-            ?: return false
-        startActivity(intent)
-        return true
-    }
-
-    private fun ResolveInfo.launcherLabel(): String {
-        return loadLabel(packageManager)?.toString().orEmpty()
-    }
-
-    private fun recordAndRender(name: String, args: String, ok: Boolean, message: String) {
-        ToolExecutionLog.record(name, args, ok, message)
-        outputView.text = "$name($args) -> $ok"
+    private fun executeAndRender(name: String, args: Map<String, String>) {
+        val result = toolExecutor.execute(name, args)
+        outputView.text = "$name($args) -> ${result.ok}: ${result.message}"
         refreshExecutionLog()
     }
 

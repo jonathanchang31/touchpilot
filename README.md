@@ -44,6 +44,10 @@ During early development, the release build is signed with the local Android
 debug key so it can be installed on emulators such as LDPlayer. Replace this
 with a real release signing key before publishing.
 
+The current agent MVP accepts an OpenAI-compatible chat completions URL, model
+name, and API key inside the app. The API key is not persisted yet; proper
+Keystore-backed secret storage is a separate security task.
+
 If building outside Android Studio, make sure either `ANDROID_HOME` is set or
 `local.properties` contains the local Android SDK path:
 
