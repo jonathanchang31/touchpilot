@@ -65,15 +65,18 @@ tools, expose maintainable project workflow, and provide a real product UI.
 
 ## Phase 6: Live Validation
 
-- [ ] Add live emulator/device test checklist.
-- [ ] Validate AccessibilityService connection.
-- [ ] Validate observe, tap, type, scroll, open app, back, and home.
-- [ ] Validate approval dialog behavior.
-- [ ] Validate skill allowlist behavior.
-- [ ] Validate local router mode.
-- [ ] Validate MCP client UI.
-- [ ] Validate debug trace export.
-- [ ] Fix bugs found during live testing.
+- [x] Add live emulator/device test checklist.
+- [x] Validate AccessibilityService connection.
+- [x] Validate observe, tap, type, scroll, open app, back, and home.
+- [x] Validate approval dialog behavior.
+- [x] Validate skill allowlist behavior.
+- [x] Validate local router mode.
+- [x] Validate MCP client UI.
+- [x] Validate debug trace export.
+- [x] Fix bugs found during live testing.
+
+See [Live Testing](LIVE_TESTING.md) for the Phase 6 checklist, commands,
+and current live-test results.
 
 ## Phase 7: Repo Quality and Workflow
 

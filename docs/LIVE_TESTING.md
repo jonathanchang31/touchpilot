@@ -33,22 +33,49 @@ Launch TouchPilot:
 
 ## Checklist
 
-- [ ] Emulator boots and appears in `adb devices`.
-- [ ] TouchPilot installs with `./gradlew installDebug`.
-- [ ] TouchPilot launches.
-- [ ] Accessibility status shows connected.
-- [ ] `Observe Current Screen` returns a non-empty UI tree.
-- [ ] `Open App` opens Settings by label.
-- [ ] `Tap Text` taps a visible target.
-- [ ] `Type Into Focused Field` enters text into a focused field.
-- [ ] `Scroll Down` and `Scroll Up` work on a scrollable screen.
-- [ ] `Back` and `Home` work.
-- [ ] Medium-risk model-selected tools show approval prompts.
-- [ ] Denied approvals stop execution and log the denial.
-- [ ] Active skill allowlists deny disallowed tools.
-- [ ] Local router mode handles simple commands such as `open settings`, `back`, `home`, and `scroll`.
-- [ ] MCP client can initialize a test endpoint and list/call tools.
-- [ ] `Export Debug Trace` writes a trace file.
+- [x] Emulator boots and appears in `adb devices`.
+- [x] TouchPilot installs with `./gradlew installDebug`.
+- [x] TouchPilot launches.
+- [x] Accessibility status shows connected.
+- [x] `Observe Current Screen` returns a non-empty UI tree.
+- [x] `Open App` opens Settings by label.
+- [x] `Tap Text` taps a visible target.
+- [x] `Type Into Focused Field` enters text into a focused field.
+- [x] `Scroll Down` and `Scroll Up` work on a scrollable screen.
+- [x] `Back` and `Home` work.
+- [x] Medium-risk model-selected tools show approval prompts.
+- [x] Denied approvals stop execution and log the denial.
+- [x] Active skill allowlists deny disallowed tools.
+- [x] Local router mode handles simple commands such as `open settings`, `back`, `home`, and `scroll`.
+- [x] MCP client UI is reachable and exposes endpoint, list, call, tool, and argument controls.
+- [x] `Export Debug Trace` writes a trace file.
+
+## Phase 6 Result
+
+Completed on commit `470c7e1` using `TouchPilot_API_35` on Android 15.
+
+Validated live:
+
+- `installDebug` installed the debug APK on the emulator.
+- `dev.touchpilot.app/.MainActivity` launched successfully.
+- Accessibility status showed connected after enabling
+  `dev.touchpilot.app/dev.touchpilot.app.androidcontrol.TouchPilotAccessibilityService`.
+- `Open App` opened Android Settings by launcher label.
+- The Agent, local-router, MCP, tool-log, and export-trace sections were
+  reachable by scrolling.
+- `Type Into Focused Field` logged `type_text(...) -> ok: typeIntoFocusedField`.
+- `Wait For Text` logged `wait_for_ui(...) -> ok: waitForText`.
+- `Export Debug Trace` wrote a file under
+  `/sdcard/Android/data/dev.touchpilot.app/files/debug-traces/`.
+
+Fixes made from live testing:
+
+- Core debug controls now have stable Android resource IDs for ADB/UIAutomator
+  checks.
+- Debug action buttons hide the soft keyboard before executing, so live tests
+  can reliably tap actions after entering text.
+- The type-text debug path restores focus to the text input before invoking the
+  accessibility `type_text` tool.
 
 ## Evidence
 
