@@ -7,7 +7,9 @@ layer.
 User
   -> Chat UI
   -> Agent Runtime
-  -> LLM Client
+  -> Agent Command Provider
+      -> OpenAI-compatible LLM Client
+      -> Local Router
   -> Tool Router
   -> Android Tool Layer
   -> Accessibility / Intents / Storage / Notifications
@@ -26,6 +28,7 @@ MCP Client
 - `memory`: local sessions, tool logs, skills, and audit storage.
 - `security`: approvals, policy checks, risk classification, secret storage.
 - `mcp`: HTTP JSON-RPC client for external MCP tool servers.
+- `agent`: cloud and local command-provider implementations.
 
 ## Execution Loop
 

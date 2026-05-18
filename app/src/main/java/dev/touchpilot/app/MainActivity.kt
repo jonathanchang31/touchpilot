@@ -14,7 +14,10 @@ import android.widget.ScrollView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.TextView
+import dev.touchpilot.app.agent.AgentProviderMode
 import dev.touchpilot.app.agent.AgentRunner
+import dev.touchpilot.app.agent.LocalRouterCommandProvider
+import dev.touchpilot.app.agent.OpenAiAgentCommandProvider
 import dev.touchpilot.app.agent.ProviderConfig
 import dev.touchpilot.app.androidcontrol.AccessibilityBridge
 import dev.touchpilot.app.memory.Skill
@@ -241,6 +244,24 @@ class MainActivity : Activity() {
             setSelection(if (savedIndex >= 0) savedIndex + 1 else 0)
         }
 
+        val providerModeTitle = TextView(this).apply {
+            text = "Agent Provider"
+            textSize = 16f
+            setPadding(0, 20, 0, 4)
+        }
+
+        val providerModeSpinner = Spinner(this).apply {
+            adapter = ArrayAdapter(
+                this@MainActivity,
+                android.R.layout.simple_spinner_item,
+                ProviderModeLabels
+            ).apply {
+                setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            }
+            val savedMode = preferences.getString("agent_provider_mode", AgentProviderMode.CLOUD.name)
+            setSelection(providerModeIndex(savedMode))
+        }
+
         val taskInput = EditText(this).apply {
             hint = "Agent task, e.g. observe the current screen"
             setSingleLine(false)
@@ -258,14 +279,16 @@ class MainActivity : Activity() {
                 )
                 val task = taskInput.text.toString()
                 val selectedSkill = selectedSkill(skillSpinner, skills)
+                val providerMode = selectedProviderMode(providerModeSpinner)
 
                 preferences.edit()
                     .putString("provider_url", providerConfig.baseUrl)
                     .putString("provider_model", providerConfig.model)
                     .putString("active_skill", selectedSkill?.id)
+                    .putString("agent_provider_mode", providerMode.name)
                     .apply()
 
-                outputView.text = "Running agent${selectedSkill?.let { " with ${it.title}" }.orEmpty()}..."
+                outputView.text = "Running ${providerMode.label()}${selectedSkill?.let { " with ${it.title}" }.orEmpty()}..."
                 Thread {
                     val resultText = runCatching {
                         AgentRunner(
@@ -273,8 +296,12 @@ class MainActivity : Activity() {
                             approvalProvider = ToolApprovalProvider { tool, args ->
                                 approveAgentTool(tool, args)
                             },
+                            commandProvider = when (providerMode) {
+                                AgentProviderMode.CLOUD -> OpenAiAgentCommandProvider(providerConfig)
+                                AgentProviderMode.LOCAL_ROUTER -> LocalRouterCommandProvider(task, selectedSkill)
+                            },
                             skill = selectedSkill
-                        ).run(task, providerConfig).transcript
+                        ).run(task).transcript
                     }.getOrElse { error ->
                         "Agent failed: ${error.message}"
                     }
@@ -417,6 +444,8 @@ class MainActivity : Activity() {
         root.addView(apiKeyInput)
         root.addView(skillTitle)
         root.addView(skillSpinner)
+        root.addView(providerModeTitle)
+        root.addView(providerModeSpinner)
         root.addView(taskInput)
         root.addView(runAgentButton)
         root.addView(mcpTitle)
@@ -470,6 +499,25 @@ class MainActivity : Activity() {
     private fun selectedSkill(skillSpinner: Spinner, skills: List<Skill>): Skill? {
         val index = skillSpinner.selectedItemPosition - 1
         return skills.getOrNull(index)
+    }
+
+    private fun selectedProviderMode(providerModeSpinner: Spinner): AgentProviderMode {
+        return if (providerModeSpinner.selectedItemPosition == 1) {
+            AgentProviderMode.LOCAL_ROUTER
+        } else {
+            AgentProviderMode.CLOUD
+        }
+    }
+
+    private fun providerModeIndex(savedMode: String?): Int {
+        return if (savedMode == AgentProviderMode.LOCAL_ROUTER.name) 1 else 0
+    }
+
+    private fun AgentProviderMode.label(): String {
+        return when (this) {
+            AgentProviderMode.CLOUD -> "cloud agent"
+            AgentProviderMode.LOCAL_ROUTER -> "local router"
+        }
     }
 
     private fun resolveApiKey(
@@ -561,5 +609,6 @@ class MainActivity : Activity() {
     private companion object {
         const val ApprovalTimeoutMs = 5 * 60 * 1000L
         const val MaxApprovalArgLength = 500
+        val ProviderModeLabels = listOf("Cloud provider", "Local router")
     }
 }

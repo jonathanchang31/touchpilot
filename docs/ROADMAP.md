@@ -45,6 +45,7 @@
 
 ## Phase 5: Local Inference
 
-- Evaluate ExecuTorch, llama.cpp, and LiteRT.
-- Start with small local models for routing and simple tool calls.
-- Keep cloud/provider fallback available for complex tasks.
+- [x] Evaluate ExecuTorch, llama.cpp, and LiteRT.
+- [x] Start with local routing for simple tool calls.
+- [x] Keep cloud/provider fallback available for complex tasks.
+- [ ] Integrate a real on-device model runtime.
