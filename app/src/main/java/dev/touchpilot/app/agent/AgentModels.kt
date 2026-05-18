@@ -6,6 +6,11 @@ data class ProviderConfig(
     val model: String
 )
 
+enum class AgentProviderMode {
+    CLOUD,
+    LOCAL_ROUTER
+}
+
 data class AgentCommand(
     val tool: String?,
     val args: Map<String, String>,

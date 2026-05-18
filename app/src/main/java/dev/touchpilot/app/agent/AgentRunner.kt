@@ -10,19 +10,19 @@ import dev.touchpilot.app.tools.ToolExecutionLog
 class AgentRunner(
     private val toolExecutor: AndroidToolExecutor,
     private val approvalProvider: ToolApprovalProvider,
+    private val commandProvider: AgentCommandProvider,
     private val skill: Skill? = null
 ) {
-    fun run(task: String, config: ProviderConfig, maxSteps: Int = 4): AgentRunResult {
-        val client = OpenAiCompatibleClient(config)
+    fun run(task: String, maxSteps: Int = 4): AgentRunResult {
         val transcript = StringBuilder()
         var context = "User task: $task\n\nCurrent screen:\n${toolExecutor.observeScreen()}"
 
         repeat(maxSteps) { step ->
             transcript.appendLine("Step ${step + 1}")
             val raw = runCatching {
-                client.complete(AgentPrompts.systemPrompt(skill), context)
+                commandProvider.complete(AgentPrompts.systemPrompt(skill), context)
             }.getOrElse { error ->
-                transcript.appendLine("Provider error: ${error.message}")
+                transcript.appendLine("Command provider error: ${error.message}")
                 return AgentRunResult(transcript.toString(), null)
             }
             transcript.appendLine("Model: $raw")
