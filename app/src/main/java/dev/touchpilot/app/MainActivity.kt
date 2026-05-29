@@ -20,9 +20,12 @@ import android.text.InputType
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.annotation.DrawableRes
+import androidx.core.content.ContextCompat
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.tabs.TabLayout
@@ -237,17 +240,35 @@ class MainActivity : Activity() {
         }.withMargins()
     }
 
-    private fun bottomNavLabel(section: Section): TextView {
-        return TextView(this).apply {
-            text = section.label
+    private fun bottomNavLabel(section: Section): View {
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setSingleLine(true)
-            textSize = 12f
-            typeface = Typeface.DEFAULT_BOLD
-            minWidth = 0
-            minHeight = 44
-            setPadding(8, 10, 8, 10)
+            minimumWidth = 0
+            minimumHeight = 56
+            setPadding(8, 6, 8, 6)
         }
+        column.addView(
+            ImageView(this).apply {
+                setImageResource(section.iconRes)
+                imageTintList = ColorStateList.valueOf(Theme.NavText)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                contentDescription = section.label
+            },
+            LinearLayout.LayoutParams(40, 40)
+        )
+        column.addView(
+            TextView(this).apply {
+                text = section.label
+                gravity = Gravity.CENTER
+                setSingleLine(true)
+                textSize = 11f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Theme.NavText)
+                setPadding(0, 2, 0, 0)
+            }
+        )
+        return column
     }
 
     private fun showSection(section: Section) {
@@ -290,10 +311,12 @@ class MainActivity : Activity() {
             nav.getTabAt(index)?.select()
         }
         Section.values().forEachIndexed { tabIndex, section ->
-            val label = nav.getTabAt(tabIndex)?.customView as? TextView
+            val container = nav.getTabAt(tabIndex)?.customView as? LinearLayout
             val selected = section == activeSection
-            label?.setTextColor(if (selected) Theme.OnAccent else Theme.NavText)
-            label?.background = rounded(
+            val tint = if (selected) Theme.OnAccent else Theme.NavText
+            (container?.getChildAt(0) as? ImageView)?.imageTintList = ColorStateList.valueOf(tint)
+            (container?.getChildAt(1) as? TextView)?.setTextColor(tint)
+            container?.background = rounded(
                 fill = if (selected) Theme.Accent else Color.TRANSPARENT,
                 radius = 10,
                 stroke = if (selected) Theme.Accent else Color.TRANSPARENT
@@ -371,7 +394,12 @@ class MainActivity : Activity() {
                 setTextColor(Theme.OnAccent)
                 backgroundTintList = ColorStateList.valueOf(Theme.Accent)
                 cornerRadius = 28
-                setPadding(34, 0, 34, 0)
+                setPadding(28, 0, 32, 0)
+                icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_send)
+                iconTint = ColorStateList.valueOf(Theme.OnAccent)
+                iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                iconPadding = 10
+                iconSize = 40
                 setOnClickListener { submitChatMessage() }
             },
             LinearLayout.LayoutParams(
@@ -547,13 +575,13 @@ class MainActivity : Activity() {
                 setPadding(0, 14, 0, 0)
             }
             buttonRow.addView(
-                primaryButton("Approve") {
+                primaryButton("Approve", iconRes = R.drawable.ic_check) {
                     resolveApproval(event, true)
                 }.apply { id = R.id.approval_approve_button },
                 rowButtonParams()
             )
             buttonRow.addView(
-                secondaryButton("Reject") {
+                secondaryButton("Reject", iconRes = R.drawable.ic_close) {
                     resolveApproval(event, false)
                 }.apply { id = R.id.approval_reject_button },
                 rowButtonParams()
@@ -1341,7 +1369,11 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun primaryButton(text: String, onClick: () -> Unit): TextView {
+    private fun primaryButton(
+        text: String,
+        @DrawableRes iconRes: Int? = null,
+        onClick: () -> Unit
+    ): TextView {
         return MaterialButton(this).apply {
             setText(text)
             gravity = Gravity.CENTER
@@ -1356,11 +1388,22 @@ class MainActivity : Activity() {
             layoutParams = controlParams()
             minHeight = 50
             setPadding(16, 12, 16, 12)
+            if (iconRes != null) {
+                icon = ContextCompat.getDrawable(this@MainActivity, iconRes)
+                iconTint = ColorStateList.valueOf(Theme.OnAccent)
+                iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                iconPadding = 8
+                iconSize = 36
+            }
             setOnClickListener { onClick() }
         }
     }
 
-    private fun secondaryButton(text: String, onClick: () -> Unit): TextView {
+    private fun secondaryButton(
+        text: String,
+        @DrawableRes iconRes: Int? = null,
+        onClick: () -> Unit
+    ): TextView {
         return MaterialButton(this).apply {
             setText(text)
             gravity = Gravity.CENTER
@@ -1374,6 +1417,13 @@ class MainActivity : Activity() {
             layoutParams = controlParams()
             minHeight = 48
             setPadding(14, 12, 14, 12)
+            if (iconRes != null) {
+                icon = ContextCompat.getDrawable(this@MainActivity, iconRes)
+                iconTint = ColorStateList.valueOf(Theme.BodyText)
+                iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                iconPadding = 8
+                iconSize = 36
+            }
             setOnClickListener { onClick() }
         }
     }
@@ -2105,11 +2155,11 @@ class MainActivity : Activity() {
 
     private enum class ApprovalState { PENDING, APPROVED, REJECTED }
 
-    private enum class Section(val label: String) {
-        CHAT("Chat"),
-        TOOLS("Tools"),
-        LOGS("Logs"),
-        SETTINGS("Settings")
+    private enum class Section(val label: String, @DrawableRes val iconRes: Int) {
+        CHAT("Chat", R.drawable.ic_chat),
+        TOOLS("Tools", R.drawable.ic_tools),
+        LOGS("Logs", R.drawable.ic_logs),
+        SETTINGS("Settings", R.drawable.ic_settings)
     }
 
     private enum class SettingsPanel(val label: String, val intro: String) {
