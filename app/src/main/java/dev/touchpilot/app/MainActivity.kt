@@ -76,8 +76,18 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         preferences = getSharedPreferences("touchpilot", MODE_PRIVATE)
-        skills = SkillStore(this).loadSkills()
         ToolExecutionLog.configure(this)
+        val skillLoad = SkillStore(this).load()
+        skills = skillLoad.skills
+        skillLoad.invalid.forEach { invalid ->
+            ToolExecutionLog.record(
+                name = "skill_load_failed",
+                args = "skill=${invalid.id}",
+                ok = false,
+                message = invalid.errors.joinToString("; "),
+                source = "skills"
+            )
+        }
         toolExecutor = AndroidToolExecutor(this)
         debugTraceExporter = DebugTraceExporter(
             context = this,
